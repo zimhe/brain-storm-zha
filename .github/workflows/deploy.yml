@@ -35,6 +35,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Check environment variables
+        run: |
+          echo "Checking OSS configuration..."
+          echo "OSS Region is set: ${{ secrets.VITE_OSS_REGION != '' }}"
+          echo "OSS Bucket is set: ${{ secrets.VITE_OSS_BUCKET != '' }}"
+          echo "OSS AccessKey ID is set: ${{ secrets.VITE_OSS_ACCESS_KEY_ID != '' }}"
+          echo "OSS AccessKey Secret is set: ${{ secrets.VITE_OSS_ACCESS_KEY_SECRET != '' }}"
+      
       - name: Build
         run: npm run build
         env:
