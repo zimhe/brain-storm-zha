@@ -39,6 +39,10 @@ jobs:
         run: npm run build
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VITE_OSS_REGION: ${{ secrets.VITE_OSS_REGION }}
+          VITE_OSS_BUCKET: ${{ secrets.VITE_OSS_BUCKET }}
+          VITE_OSS_ACCESS_KEY_ID: ${{ secrets.VITE_OSS_ACCESS_KEY_ID }}
+          VITE_OSS_ACCESS_KEY_SECRET: ${{ secrets.VITE_OSS_ACCESS_KEY_SECRET }}
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
