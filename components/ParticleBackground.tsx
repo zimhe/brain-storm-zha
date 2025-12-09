@@ -133,45 +133,12 @@ const ParticleBackground: React.FC = () => {
         ctx.stroke();
       });
 
-      // 绘制磁场源标记
+      // 绘制点源：统一白色实心小圆（无光晕、无符号）
       fieldSources.forEach(source => {
-        // 根据类型选择颜色和样式
-        let color = '';
-        let symbol = '';
-        
-        if (source.type === 'spin') {
-          color = 'rgba(100, 200, 255, 0.8)'; // 青色 - 旋转
-          symbol = '⟳';
-        } else if (source.type === 'attract') {
-          color = 'rgba(255, 100, 100, 0.8)'; // 红色 - 吸引
-          symbol = '⊕';
-        } else if (source.type === 'repel') {
-          color = 'rgba(100, 255, 100, 0.8)'; // 绿色 - 排斥
-          symbol = '⊖';
-        }
-        
-        // 光晕
-        const gradient = ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, 40);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(source.x, source.y, 40, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 中心点
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(source.x, source.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 符号
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '20px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(symbol, source.x, source.y);
+        ctx.beginPath();
+        ctx.arc(source.x, source.y, 3, 0, Math.PI * 2);
+        ctx.fill();
       });
 
       animationFrameId = requestAnimationFrame(animate);
