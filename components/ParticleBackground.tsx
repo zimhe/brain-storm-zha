@@ -51,7 +51,7 @@ const ParticleBackground: React.FC = () => {
       return { fx, fy };
     };
 
-    // 生成流线（磁场线）- 稳定版本
+    // 生成流线（磁场线）- 实时计算
     const generateFieldLine = (startX: number, startY: number) => {
       const points = [];
       let x = startX;
@@ -76,32 +76,22 @@ const ParticleBackground: React.FC = () => {
       return points;
     };
 
-    // 生成固定的流线起点网格
-    const fieldLines: Array<{ points: Array<{ x: number; y: number }>; color: string }> = [];
-    const gridSize = width < 768 ? 60 : 40;
+    // 随机生成稀疏的流线起点
+    const lineStarts: Array<{ x: number; y: number; hue: number }> = [];
+    const lineCount = width < 768 ? 50 : 80; // 减少线条数量
     
-    const initializeFieldLines = () => {
-      fieldLines.length = 0;
-      for (let gx = 0; gx < width; gx += gridSize) {
-        for (let gy = 0; gy < height; gy += gridSize) {
-          // 添加一些随机偏移
-          const startX = gx + (Math.random() - 0.5) * gridSize * 0.5;
-          const startY = gy + (Math.random() - 0.5) * gridSize * 0.5;
-          const points = generateFieldLine(startX, startY);
-          
-          if (points.length > 10) {
-            // 根据起点位置确定颜色
-            const hue = (gx / width * 180 + gy / height * 180) % 360;
-            fieldLines.push({ 
-              points, 
-              color: `hsla(${hue}, 70%, 50%, 0.4)`
-            });
-          }
-        }
+    const initializeLineStarts = () => {
+      lineStarts.length = 0;
+      for (let i = 0; i < lineCount; i++) {
+        lineStarts.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          hue: Math.random() * 360
+        });
       }
     };
 
-    initializeFieldLines();
+    initializeLineStarts();
 
     let time = 0;
     let animationFrameId: number;
@@ -118,27 +108,24 @@ const ParticleBackground: React.FC = () => {
         if (source.y < 100 || source.y > height - 100) source.vy *= -1;
       });
 
-      // 每隔一段时间重新生成流线
-      if (Math.floor(time * 20) % 100 === 0) {
-        initializeFieldLines();
-      }
-
-      // 半透明清空，产生拖尾效果
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      // 清空画布（降低透明度以产生轻微拖尾）
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
       ctx.fillRect(0, 0, width, height);
 
-      // 绘制流线
-      fieldLines.forEach((line) => {
-        if (line.points.length < 2) return;
+      // 实时生成并绘制流线
+      lineStarts.forEach((start) => {
+        const points = generateFieldLine(start.x, start.y);
+        
+        if (points.length < 2) return;
         
         ctx.beginPath();
-        ctx.moveTo(line.points[0].x, line.points[0].y);
+        ctx.moveTo(points[0].x, points[0].y);
         
-        for (let i = 1; i < line.points.length; i++) {
-          ctx.lineTo(line.points[i].x, line.points[i].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
         }
         
-        ctx.strokeStyle = line.color;
+        ctx.strokeStyle = `hsla(${start.hue}, 70%, 50%, 0.5)`;
         ctx.lineWidth = 1;
         ctx.stroke();
       });
@@ -194,7 +181,7 @@ const ParticleBackground: React.FC = () => {
       height = window.innerHeight;
       canvas.width = width;
       canvas.height = height;
-      initializeFieldLines();
+      initializeLineStarts();
     };
 
     window.addEventListener('resize', handleResize);
