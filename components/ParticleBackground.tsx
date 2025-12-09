@@ -78,7 +78,7 @@ const ParticleBackground: React.FC = () => {
 
     // 随机生成稀疏的流线起点
     const lineStarts: Array<{ x: number; y: number; hue: number }> = [];
-    const lineCount = width < 768 ? 50 : 80; // 减少线条数量
+    const lineCount = width < 768 ? 256 : 512; // 减少线条数量
     
     const initializeLineStarts = () => {
       lineStarts.length = 0;
