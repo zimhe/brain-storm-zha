@@ -108,8 +108,8 @@ const ParticleBackground: React.FC = () => {
         if (source.y < 100 || source.y > height - 100) source.vy *= -1;
       });
 
-      // 清空画布（降低透明度以产生轻微拖尾）
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      // 完全清空画布，不使用拖尾
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
       // 实时生成并绘制流线
@@ -125,8 +125,11 @@ const ParticleBackground: React.FC = () => {
           ctx.lineTo(points[i].x, points[i].y);
         }
         
-        ctx.strokeStyle = `hsla(${start.hue}, 70%, 50%, 0.5)`;
+        // 简单的等宽2D线条
+        ctx.strokeStyle = `hsla(${start.hue}, 70%, 60%, 0.7)`;
         ctx.lineWidth = 1;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.stroke();
       });
 
