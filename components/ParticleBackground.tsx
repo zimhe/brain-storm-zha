@@ -14,45 +14,70 @@ const ParticleBackground: React.FC = () => {
     canvas.width = width;
     canvas.height = height;
 
-    // 磁场源点，包含不同类型：spin(旋转)、attract(吸引)、repel(排斥)
-    const fieldSources = [
-      { x: width * 0.25, y: height * 0.3, strength: 150, vx: 0.3, vy: 0.2, type: 'spin' as const },
-      { x: width * 0.75, y: height * 0.4, strength: 120, vx: -0.25, vy: 0.25, type: 'attract' as const },
-      { x: width * 0.5, y: height * 0.7, strength: -100, vx: 0.2, vy: -0.3, type: 'repel' as const },
-      { x: width * 0.6, y: height * 0.2, strength: 80, vx: -0.15, vy: 0.15, type: 'spin' as const },
-    ];
+    // 动态磁场源点：增加到6个，类型包括 spin/attract/repel
+    // 每个 source 有 baseStrength, freq, phase，用于随时间震荡强度
+    const fieldSources: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      type: 'spin' | 'attract' | 'repel';
+      baseStrength: number;
+      freq: number;
+      phase: number;
+    }> = [];
+
+    const types: Array<'spin' | 'attract' | 'repel'> = ['spin', 'attract', 'repel'];
+    const sourceCount = 6;
+    for (let i = 0; i < sourceCount; i++) {
+      const t = types[i % types.length];
+      const base = t === 'attract' ? 220 : t === 'repel' ? -220 : 180; // 放大吸引/排斥强度
+      fieldSources.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: (Math.random() - 0.5) * 0.6,
+        type: t,
+        baseStrength: base * (0.8 + Math.random() * 0.6),
+        freq: 0.2 + Math.random() * 0.6,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
 
     // 计算某点的场强（根据不同类型）
-    const getFieldStrength = (x: number, y: number): { fx: number; fy: number } => {
+    const getFieldStrength = (x: number, y: number, ttime: number): { fx: number; fy: number } => {
       let fx = 0;
       let fy = 0;
-      
+
       fieldSources.forEach(source => {
+        // 动态强度随时间变化
+        const currentStrength = source.baseStrength * (1 + 0.5 * Math.sin(ttime * source.freq + source.phase));
+
         const dx = x - source.x;
         const dy = y - source.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) + 1;
-        const force = source.strength / dist;
-        
+        const dist = Math.sqrt(dx * dx + dy * dy) + 10; // 加入偏移防止过强
+        const force = currentStrength / (dist * dist * 0.001 + 1);
+
         if (source.type === 'spin') {
           // 旋转场：垂直于半径方向
-          fx += -dy * force * 0.01;
-          fy += dx * force * 0.01;
+          fx += -dy * force * 0.02;
+          fy += dx * force * 0.02;
         } else if (source.type === 'attract') {
           // 吸引场：指向中心
-          fx += -dx * force * 0.01;
-          fy += -dy * force * 0.01;
+          fx += -dx * force * 0.02;
+          fy += -dy * force * 0.02;
         } else if (source.type === 'repel') {
           // 排斥场：远离中心
-          fx += dx * force * 0.01;
-          fy += dy * force * 0.01;
+          fx += dx * force * 0.02;
+          fy += dy * force * 0.02;
         }
       });
-      
+
       return { fx, fy };
     };
 
     // 生成流线（磁场线）- 实时计算
-    const generateFieldLine = (startX: number, startY: number) => {
+    const generateFieldLine = (startX: number, startY: number, ttime: number) => {
       const points = [];
       let x = startX;
       let y = startY;
@@ -64,7 +89,7 @@ const ParticleBackground: React.FC = () => {
         
         points.push({ x, y });
         
-        const field = getFieldStrength(x, y);
+        const field = getFieldStrength(x, y, ttime);
         const magnitude = Math.sqrt(field.fx * field.fx + field.fy * field.fy);
         
         if (magnitude < 0.001) break;
@@ -78,7 +103,7 @@ const ParticleBackground: React.FC = () => {
 
     // 随机生成稀疏的流线起点
     const lineStarts: Array<{ x: number; y: number; hue: number }> = [];
-    const lineCount = width < 768 ? 256 : 512; // 减少线条数量
+    const lineCount = width < 768 ? 50 : 80; // 稀疏线条数量
     
     const initializeLineStarts = () => {
       lineStarts.length = 0;
@@ -150,28 +175,12 @@ const ParticleBackground: React.FC = () => {
           symbol = '⊖';
         }
         
-        // 光晕
-        const gradient = ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, 40);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(source.x, source.y, 40, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 中心点
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(source.x, source.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 符号
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '20px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(symbol, source.x, source.y);
+          // 简单的点源表示：空心圆（无光晕、无符号）
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(source.x, source.y, 4, 0, Math.PI * 2);
+          ctx.stroke();
       });
 
       animationFrameId = requestAnimationFrame(animate);
