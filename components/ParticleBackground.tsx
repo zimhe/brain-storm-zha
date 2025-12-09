@@ -137,9 +137,9 @@ const ParticleBackground: React.FC = () => {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
-      // 实时生成并绘制流线
+      // 实时生成并绘制流线（传入当前时间用于动态强度）
       lineStarts.forEach((start) => {
-        const points = generateFieldLine(start.x, start.y);
+        const points = generateFieldLine(start.x, start.y, time);
         
         if (points.length < 2) return;
         
@@ -151,8 +151,8 @@ const ParticleBackground: React.FC = () => {
         }
         
         // 简单的等宽2D线条
-        ctx.strokeStyle = `hsla(${start.hue}, 70%, 60%, 0.7)`;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = `hsla(${start.hue}, 70%, 60%, 0.8)`;
+        ctx.lineWidth = 1.2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.stroke();
