@@ -14,14 +14,15 @@ const ParticleBackground: React.FC = () => {
     canvas.width = width;
     canvas.height = height;
 
-    // 磁场源点（可以移动的）
+    // 磁场源点，包含不同类型：spin(旋转)、attract(吸引)、repel(排斥)
     const fieldSources = [
-      { x: width * 0.3, y: height * 0.3, strength: 1, vx: 0.2, vy: 0.15 },
-      { x: width * 0.7, y: height * 0.6, strength: -0.8, vx: -0.15, vy: 0.2 },
-      { x: width * 0.5, y: height * 0.8, strength: 0.6, vx: 0.1, vy: -0.1 },
+      { x: width * 0.25, y: height * 0.3, strength: 150, vx: 0.3, vy: 0.2, type: 'spin' as const },
+      { x: width * 0.75, y: height * 0.4, strength: 120, vx: -0.25, vy: 0.25, type: 'attract' as const },
+      { x: width * 0.5, y: height * 0.7, strength: -100, vx: 0.2, vy: -0.3, type: 'repel' as const },
+      { x: width * 0.6, y: height * 0.2, strength: 80, vx: -0.15, vy: 0.15, type: 'spin' as const },
     ];
 
-    // 计算某点的场强
+    // 计算某点的场强（根据不同类型）
     const getFieldStrength = (x: number, y: number): { fx: number; fy: number } => {
       let fx = 0;
       let fy = 0;
@@ -29,114 +30,158 @@ const ParticleBackground: React.FC = () => {
       fieldSources.forEach(source => {
         const dx = x - source.x;
         const dy = y - source.y;
-        const distSq = dx * dx + dy * dy + 1;
-        const force = source.strength / distSq;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 1;
+        const force = source.strength / dist;
         
-        // 创建旋转场效果
-        fx += (-dy * force * 0.5);
-        fy += (dx * force * 0.5);
+        if (source.type === 'spin') {
+          // 旋转场：垂直于半径方向
+          fx += -dy * force * 0.01;
+          fy += dx * force * 0.01;
+        } else if (source.type === 'attract') {
+          // 吸引场：指向中心
+          fx += -dx * force * 0.01;
+          fy += -dy * force * 0.01;
+        } else if (source.type === 'repel') {
+          // 排斥场：远离中心
+          fx += dx * force * 0.01;
+          fy += dy * force * 0.01;
+        }
       });
       
       return { fx, fy };
     };
 
-    // 生成流线（磁场线）
-    const generateFieldLine = (startX: number, startY: number, direction: number) => {
+    // 生成流线（磁场线）- 稳定版本
+    const generateFieldLine = (startX: number, startY: number) => {
       const points = [];
       let x = startX;
       let y = startY;
-      const stepSize = 3;
-      const maxSteps = 200;
+      const stepSize = 2;
+      const maxSteps = 300;
 
       for (let i = 0; i < maxSteps; i++) {
-        if (x < 0 || x > width || y < 0 || y > height) break;
+        if (x < -50 || x > width + 50 || y < -50 || y > height + 50) break;
         
         points.push({ x, y });
         
         const field = getFieldStrength(x, y);
         const magnitude = Math.sqrt(field.fx * field.fx + field.fy * field.fy);
         
-        if (magnitude < 0.01) break;
+        if (magnitude < 0.001) break;
         
-        x += (field.fx / magnitude) * stepSize * direction;
-        y += (field.fy / magnitude) * stepSize * direction;
+        x += field.fx * stepSize;
+        y += field.fy * stepSize;
       }
       
       return points;
     };
 
-    // 生成所有流线
-    const fieldLines: Array<Array<{ x: number; y: number }>> = [];
-    const lineCount = width < 768 ? 30 : 50;
+    // 生成固定的流线起点网格
+    const fieldLines: Array<{ points: Array<{ x: number; y: number }>; color: string }> = [];
+    const gridSize = width < 768 ? 60 : 40;
     
-    for (let i = 0; i < lineCount; i++) {
-      const startX = Math.random() * width;
-      const startY = Math.random() * height;
-      const direction = Math.random() > 0.5 ? 1 : -1;
-      fieldLines.push(generateFieldLine(startX, startY, direction));
-    }
+    const initializeFieldLines = () => {
+      fieldLines.length = 0;
+      for (let gx = 0; gx < width; gx += gridSize) {
+        for (let gy = 0; gy < height; gy += gridSize) {
+          // 添加一些随机偏移
+          const startX = gx + (Math.random() - 0.5) * gridSize * 0.5;
+          const startY = gy + (Math.random() - 0.5) * gridSize * 0.5;
+          const points = generateFieldLine(startX, startY);
+          
+          if (points.length > 10) {
+            // 根据起点位置确定颜色
+            const hue = (gx / width * 180 + gy / height * 180) % 360;
+            fieldLines.push({ 
+              points, 
+              color: `hsla(${hue}, 70%, 50%, 0.4)`
+            });
+          }
+        }
+      }
+    };
+
+    initializeFieldLines();
 
     let time = 0;
     let animationFrameId: number;
 
     const animate = () => {
-      time += 0.01;
+      time += 0.005;
       
-      // 更新磁场源位置
+      // 缓慢更新磁场源位置
       fieldSources.forEach(source => {
         source.x += source.vx;
         source.y += source.vy;
         
-        if (source.x < 0 || source.x > width) source.vx *= -1;
-        if (source.y < 0 || source.y > height) source.vy *= -1;
+        if (source.x < 100 || source.x > width - 100) source.vx *= -1;
+        if (source.y < 100 || source.y > height - 100) source.vy *= -1;
       });
 
-      // 清空画布
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
-      ctx.fillRect(0, 0, width, height);
-
-      // 重新生成流线（每几帧更新一次）
-      if (Math.floor(time * 10) % 3 === 0) {
-        fieldLines.length = 0;
-        for (let i = 0; i < lineCount; i++) {
-          const startX = Math.random() * width;
-          const startY = Math.random() * height;
-          const direction = Math.random() > 0.5 ? 1 : -1;
-          fieldLines.push(generateFieldLine(startX, startY, direction));
-        }
+      // 每隔一段时间重新生成流线
+      if (Math.floor(time * 20) % 100 === 0) {
+        initializeFieldLines();
       }
 
+      // 半透明清空，产生拖尾效果
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, width, height);
+
       // 绘制流线
-      fieldLines.forEach((line, lineIndex) => {
-        if (line.length < 2) return;
+      fieldLines.forEach((line) => {
+        if (line.points.length < 2) return;
         
         ctx.beginPath();
-        ctx.moveTo(line[0].x, line[0].y);
+        ctx.moveTo(line.points[0].x, line.points[0].y);
         
-        for (let i = 1; i < line.length; i++) {
-          ctx.lineTo(line[i].x, line[i].y);
+        for (let i = 1; i < line.points.length; i++) {
+          ctx.lineTo(line.points[i].x, line.points[i].y);
         }
         
-        // 根据线的位置和时间创建颜色变化
-        const hue = (lineIndex * 30 + time * 20) % 360;
-        const saturation = 70 + Math.sin(time + lineIndex) * 20;
-        const lightness = 40 + Math.sin(time * 0.5 + lineIndex) * 10;
-        
-        ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-        ctx.lineWidth = 1 + Math.sin(time + lineIndex * 0.5) * 0.5;
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = 1;
         ctx.stroke();
       });
 
-      // 绘制磁场源（可选）
+      // 绘制磁场源标记
       fieldSources.forEach(source => {
-        const gradient = ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, 30);
-        gradient.addColorStop(0, `rgba(255, 255, 255, 0.3)`);
-        gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        // 根据类型选择颜色和样式
+        let color = '';
+        let symbol = '';
+        
+        if (source.type === 'spin') {
+          color = 'rgba(100, 200, 255, 0.8)'; // 青色 - 旋转
+          symbol = '⟳';
+        } else if (source.type === 'attract') {
+          color = 'rgba(255, 100, 100, 0.8)'; // 红色 - 吸引
+          symbol = '⊕';
+        } else if (source.type === 'repel') {
+          color = 'rgba(100, 255, 100, 0.8)'; // 绿色 - 排斥
+          symbol = '⊖';
+        }
+        
+        // 光晕
+        const gradient = ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, 40);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(source.x, source.y, 30, 0, Math.PI * 2);
+        ctx.arc(source.x, source.y, 40, 0, Math.PI * 2);
         ctx.fill();
+        
+        // 中心点
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(source.x, source.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 符号
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = '20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(symbol, source.x, source.y);
       });
 
       animationFrameId = requestAnimationFrame(animate);
@@ -149,6 +194,7 @@ const ParticleBackground: React.FC = () => {
       height = window.innerHeight;
       canvas.width = width;
       canvas.height = height;
+      initializeFieldLines();
     };
 
     window.addEventListener('resize', handleResize);
