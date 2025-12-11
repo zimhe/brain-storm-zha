@@ -3,10 +3,32 @@ import { isOSSConfigured } from '../config/oss.config';
 import { listImagesFromOSS, getMultipleOSSFileUrls } from './ossService';
 
 /**
- * 从阿里云OSS获取图片数据（如果配置了OSS）
- * 否则返回模拟数据
+ * 检查给定的GUID是否有有效的图片数据
+ * 返回布尔值表示是否找到图片
  */
-export const fetchProcessData = async (guid: string): Promise<ProcessData> => {
+export const hasValidSessionData = async (guid: string): Promise<boolean> => {
+  // 检查是否配置了OSS
+  if (isOSSConfigured()) {
+    try {
+      const imageFiles = await listImagesFromOSS(guid);
+      return imageFiles.length > 0;
+    } catch (error) {
+      console.error('检查OSS数据时出错:', error);
+      return false;
+    }
+  } else {
+    // 对于模拟数据，我们认为所有session都是有效的
+    // 但可以根据需要添加特定的验证逻辑
+    return true;
+  }
+};
+
+/**
+ * 从阿里云OSS获取图片数据（如果配置了OSS）
+ * 如果找到数据则返回ProcessData，否则返回null
+ * 只有在未配置OSS时才返回模拟数据
+ */
+export const fetchProcessData = async (guid: string): Promise<ProcessData | null> => {
   // 检查是否配置了OSS
   if (isOSSConfigured()) {
     return await fetchFromOSS(guid);
@@ -19,14 +41,14 @@ export const fetchProcessData = async (guid: string): Promise<ProcessData> => {
 /**
  * 从真实的阿里云OSS获取数据
  */
-const fetchFromOSS = async (guid: string): Promise<ProcessData> => {
+const fetchFromOSS = async (guid: string): Promise<ProcessData | null> => {
   try {
     // 列出OSS中的图片文件
     const imageFiles = await listImagesFromOSS(guid);
     
     if (imageFiles.length === 0) {
-      console.warn(`OSS中未找到GUID ${guid} 的图片，使用模拟数据`);
-      return await fetchMockData(guid);
+      console.warn(`OSS中未找到GUID ${guid} 的图片`);
+      return null;
     }
 
     // 获取所有图片的访问URL
@@ -57,8 +79,8 @@ const fetchFromOSS = async (guid: string): Promise<ProcessData> => {
       images,
     };
   } catch (error) {
-    console.error('从OSS获取数据失败，使用模拟数据:', error);
-    return await fetchMockData(guid);
+    console.error('从OSS获取数据失败:', error);
+    return null;
   }
 };
 
@@ -97,14 +119,14 @@ const fetchMockData = async (guid: string): Promise<ProcessData> => {
 /**
  * Extracts the GUID from the URL query parameters.
  * Supports ?id=... or ?guid=...
+ * Returns null if no valid ID is found
  */
-export const getGuidFromUrl = (): string => {
+export const getGuidFromUrl = (): string | null => {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id') || params.get('guid');
   
-  if (id) return id;
-
-  // Fallback for demo purposes if no ID is scanned
-  console.log("No ID found in URL, generating demo session.");
-  return "demo-session-zha-" + Math.floor(Math.random() * 10000);
+  if (id && id.trim()) return id.trim();
+  
+  // Return null if no ID is found instead of generating demo
+  return null;
 };
