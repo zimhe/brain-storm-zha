@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ProcessImage } from '../types';
-import { X, Download, Maximize2, Share2 } from 'lucide-react';
+import { X, Download, Maximize2 } from 'lucide-react';
 
 interface ImageViewerProps {
   image: ProcessImage | null;
@@ -8,16 +8,6 @@ interface ImageViewerProps {
 }
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ image, onClose }) => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    // 检测是否是移动设备
-    const checkMobile = () => {
-      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    };
-    checkMobile();
-  }, []);
-
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -29,41 +19,39 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ image, onClose }) => {
   const handleDownload = async () => {
     if (!image) return;
 
-    // 移动端优先尝试使用 Web Share API
-    if (isMobile && navigator.share) {
-      try {
-        // 获取图片作为 Blob
-        const response = await fetch(image.url);
-        const blob = await response.blob();
-        const file = new File([blob], `brainstorm-${image.id}.jpg`, { type: 'image/jpeg' });
-        
-        // 使用 Web Share API 分享
-        await navigator.share({
-          files: [file],
-          title: 'Brainstorming Image',
-          text: image.description || 'Generated image from Brainstorming'
-        });
-      } catch (error) {
-        console.log('Share failed or was cancelled:', error);
-        // 如果分享失败，回退到传统下载方式
-        downloadImage();
+    try {
+      // 检测是否是移动设备
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // 移动端：在新窗口打开图片，用户可以长按保存到相册
+        window.open(image.url, '_blank');
+        return;
       }
-    } else {
-      // 桌面端或不支持 Web Share API 的移动端，使用传统下载
-      downloadImage();
+      
+      // 桌面端：下载图片文件
+      const response = await fetch(image.url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `brainstorm-${image.id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      // 回退方案：直接使用图片URL
+      const link = document.createElement('a');
+      link.href = image.url;
+      link.download = `brainstorm-${image.id}.jpg`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
-  };
-
-  const downloadImage = () => {
-    if (!image) return;
-    
-    const link = document.createElement('a');
-    link.href = image.url;
-    link.download = `brainstorm-${image.id}.jpg`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link)
   };
 
   if (!image) return null;
@@ -75,13 +63,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ image, onClose }) => {
         <button
           onClick={handleDownload}
           className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-md border border-white/10 group"
-          title={isMobile ? "Share/Save Image" : "Download High Res"}
+          title="Download High Res"
         >
-          {isMobile ? (
-            <Share2 size={20} className="group-hover:scale-110 transition-transform" />
-          ) : (
-            <Download size={20} className="group-hover:scale-110 transition-transform" />
-          )}
+          <Download size={20} className="group-hover:scale-110 transition-transform" />
         </button>
         <button
           onClick={onClose}
